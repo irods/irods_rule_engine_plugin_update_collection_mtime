@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.7.0 FATAL_ERROR)
 project(irods_rule_engine_plugin-update_collection_mtime)
 
-find_package(IRODS 4.2.5 EXACT REQUIRED CONFIG)
+find_package(IRODS 4.3.0 EXACT REQUIRED CONFIG)
 
 set(CMAKE_C_COMPILER ${IRODS_EXTERNALS_FULLPATH_CLANG}/bin/clang)
 set(CMAKE_CXX_COMPILER ${IRODS_EXTERNALS_FULLPATH_CLANG}/bin/clang++)
