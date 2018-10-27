@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(irods_rule_engine_plugin-update_collection_timestamp)
+project(irods_rule_engine_plugin-update_collection_mtime)
 
 find_package(IRODS 4.2.5 EXACT REQUIRED CONFIG)
 
@@ -15,9 +15,9 @@ set(CMAKE_INSTALL_RPATH ${IRODS_EXTERNALS_FULLPATH_CLANG_RUNTIME}/lib)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -stdlib=libc++")
 
-set(PLUGIN irods-rule-engine-plugin-update-collection-timestamp)
+set(PLUGIN irods_rule_engine_plugin-update_collection_mtime)
 
-add_library(${PLUGIN} MODULE ${CMAKE_SOURCE_DIR}/src/libirods_rule_engine_plugin-update_collection_timestamp.cpp)
+add_library(${PLUGIN} MODULE ${CMAKE_SOURCE_DIR}/src/libirods_rule_engine_plugin-update_collection_mtime.cpp)
 set_property(TARGET ${PLUGIN} PROPERTY CXX_STANDARD ${IRODS_CXX_STANDARD})
 target_compile_options(${PLUGIN} PRIVATE -Wno-write-strings)
 target_compile_definitions(${PLUGIN} PRIVATE ${IRODS_COMPILE_DEFINITIONS} BOOST_SYSTEM_NO_DEPRECATED)
@@ -38,7 +38,7 @@ set(IRODS_PLUGIN_VERSION_MINOR 0)
 set(IRODS_PLUGIN_VERSION_PATCH 0)
 set(IRODS_PLUGIN_VERSION "${IRODS_PLUGIN_VERSION_MAJOR}.${IRODS_PLUGIN_VERSION_MINOR}.${IRODS_PLUGIN_VERSION_PATCH}")
 
-set(CPACK_PACKAGE_FILE_NAME "irods-rule-engine-plugin-update-collection-timestamp-${IRODS_PLUGIN_VERSION}-${IRODS_LINUX_DISTRIBUTION_NAME}${IRODS_LINUX_DISTRIBUTION_VERSION_MAJOR}-${CMAKE_SYSTEM_PROCESSOR}")
+set(CPACK_PACKAGE_FILE_NAME "irods-rule-engine-plugin-update-collection-mtime-${IRODS_PLUGIN_VERSION}-${IRODS_LINUX_DISTRIBUTION_NAME}${IRODS_LINUX_DISTRIBUTION_VERSION_MAJOR}-${CMAKE_SYSTEM_PROCESSOR}")
 
 set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 set(CPACK_COMPONENT_INCLUDE_TOPLEVEL_DIRECTORY OFF)
@@ -69,10 +69,10 @@ set(CPACK_RPM_PACKAGE_AUTOPROV 0)
 
 set(CPACK_ARCHIVE_COMPONENT_INSTALL OFF)
 
-set(CPACK_DEBIAN_PACKAGE_NAME "irods-rule-engine-plugin-update-collection-timestamp")
+set(CPACK_DEBIAN_PACKAGE_NAME "irods-rule-engine-plugin-update-collection-mtime")
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "${IRODS_PACKAGE_DEPENDENCIES_STRING}, irods-server (= ${IRODS_VERSION}), irods-runtime (= ${IRODS_VERSION}), libc6")
 
-set(CPACK_RPM_PACKAGE_NAME "irods-rule-engine-plugin-update-collection-timestamp")
+set(CPACK_RPM_PACKAGE_NAME "irods-rule-engine-plugin-update-collection-mtime")
 if (IRODS_LINUX_DISTRIBUTION_NAME STREQUAL "centos" OR IRODS_LINUX_DISTRIBUTION_NAME STREQUAL "centos linux")
   set(CPACK_RPM_PACKAGE_REQUIRES "${IRODS_PACKAGE_DEPENDENCIES_STRING}, irods-server = ${IRODS_VERSION}, irods-runtime = ${IRODS_VERSION}, openssl")
 elseif (IRODS_LINUX_DISTRIBUTION_NAME STREQUAL "opensuse")

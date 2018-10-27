@@ -40,7 +40,7 @@ namespace util {
 ruleExecInfo_t& get_rei(irods::callback& _effect_handler)
 {
     ruleExecInfo_t* rei{};
-    irods::error result{_effect_handler(std::string{"unsafe_ms_ctx"}, &rei)};
+    irods::error result{_effect_handler("unsafe_ms_ctx", &rei)};
 
     if (!result.ok()) {
         THROW(result.code(), "failed to get rule execution info");
@@ -53,7 +53,7 @@ template <typename Function>
 auto sudo(ruleExecInfo_t& _rei, Function _func) -> decltype(_func())
 {
     auto& auth_flag = _rei.rsComm->clientUser.authInfo.authFlag;
-    const int old_auth_flag = auth_flag;
+    const auto old_auth_flag = auth_flag;
 
     // Elevate privileges.
     auth_flag = LOCAL_PRIV_USER_AUTH;
@@ -70,11 +70,14 @@ void update_collection_mtime(irods::callback& _effect_handler,
                              const std::string& _path,
                              const char* _new_mtime = nullptr)
 {
-    rodsLog(LOG_NOTICE, "updating collection mtime for [%s] ...", _path.c_str());
+    rodsLog(LOG_DEBUG, "updating collection mtime for [%s] ...", _path.c_str());
 
     collInp_t input{};
 
-    rstrcpy(input.collName, _path.c_str(), MAX_NAME_LEN);
+    if (!rstrcpy(input.collName, _path.c_str(), MAX_NAME_LEN)) {
+        rodsLog(LOG_ERROR, "failed to copy path into update arguments [path => %s]", _path.c_str());
+        return;
+    }
 
     if (_new_mtime) {
         addKeyVal(&input.condInput, COLLECTION_MTIME_KW, _new_mtime);
@@ -92,7 +95,7 @@ void update_collection_mtime(irods::callback& _effect_handler,
     });
 
     if (ec != 0) {
-        rodsLog(LOG_NOTICE, "failed to update collection mtime for [%s] [error code => %d]", _path.c_str(), ec);
+        rodsLog(LOG_ERROR, "failed to update collection mtime for [%s] [error code => %d]", _path.c_str(), ec);
     }
 }
 
@@ -170,14 +173,14 @@ namespace handler {
 
 irods::error pep_api_coll_create_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
 {
-    rodsLog(LOG_NOTICE, ">>> pep_api_coll_create_post");
+    rodsLog(LOG_DEBUG, ">>> pep_api_coll_create_post");
 
     try
     {
         auto iter = std::begin(_rule_arguments);
         auto* input = boost::any_cast<collInp_t*>(*std::next(iter, 2));
 
-        rodsLog(LOG_NOTICE, util::to_string(*input).c_str());
+        rodsLog(LOG_DEBUG, util::to_string(*input).c_str());
 
         util::update_collection_mtime(_effect_handler, util::parent_path(input->collName));
     }
@@ -196,18 +199,18 @@ public:
 
     static irods::error pre(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
     {
-        rodsLog(LOG_NOTICE, ">>> pep_api_data_obj_close_pre");
+        rodsLog(LOG_DEBUG, ">>> pep_api_data_obj_close_pre");
 
         try
         {
             auto iter = std::begin(_rule_arguments);
             auto* input = boost::any_cast<openedDataObjInp_t*>(*std::next(iter, 2));
 
-            rodsLog(LOG_NOTICE, util::to_string(*input).c_str());
+            rodsLog(LOG_DEBUG, util::to_string(*input).c_str());
 
             const auto& desc = irods::get_l1desc(input->l1descInx);
 
-            rodsLog(LOG_NOTICE, util::to_string(desc).c_str());
+            rodsLog(LOG_DEBUG, util::to_string(desc).c_str());
 
             logical_path_ = desc.dataObjInp->objPath;
         }
@@ -221,7 +224,7 @@ public:
 
     static irods::error post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
     {
-        rodsLog(LOG_NOTICE, ">>> pep_api_data_obj_close_post");
+        rodsLog(LOG_DEBUG, ">>> pep_api_data_obj_close_post");
 
         static constexpr std::array<int, 11> unsupported_operations{{
             DONE_OPR,
@@ -242,7 +245,7 @@ public:
             auto iter = std::begin(_rule_arguments);
             auto* input = boost::any_cast<openedDataObjInp_t*>(*std::next(iter, 2));
 
-            rodsLog(LOG_NOTICE, util::to_string(*input).c_str());
+            rodsLog(LOG_DEBUG, util::to_string(*input).c_str());
 
             auto b = std::cbegin(unsupported_operations);
             auto e = std::cend(unsupported_operations);
@@ -267,14 +270,14 @@ std::string pep_api_data_obj_close::logical_path_{};
 
 irods::error pep_api_data_obj_put_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
 {
-    rodsLog(LOG_NOTICE, ">>> pep_api_data_obj_put_post");
+    rodsLog(LOG_DEBUG, ">>> pep_api_data_obj_put_post");
 
     try
     {
         auto iter = std::begin(_rule_arguments);
         auto* input = boost::any_cast<dataObjInp_t*>(*std::next(iter, 2));
 
-        rodsLog(LOG_NOTICE, util::to_string(*input).c_str());
+        rodsLog(LOG_DEBUG, util::to_string(*input).c_str());
 
         util::update_collection_mtime(_effect_handler, util::parent_path(input->objPath));
     }
@@ -288,20 +291,22 @@ irods::error pep_api_data_obj_put_post(std::list<boost::any>& _rule_arguments, i
 
 irods::error pep_api_data_obj_rename_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
 {
-    rodsLog(LOG_NOTICE, ">>> pep_api_data_obj_rename_post");
+    rodsLog(LOG_DEBUG, ">>> pep_api_data_obj_rename_post");
 
     try
     {
         auto iter = std::begin(_rule_arguments);
         auto* input = boost::any_cast<dataObjCopyInp_t*>(*std::next(iter, 2));
 
-        rodsLog(LOG_NOTICE, util::to_string(*input).c_str());
+        rodsLog(LOG_DEBUG, util::to_string(*input).c_str());
 
         char now[timestamp_buffer_size];
         getNowStr(now);
 
         util::update_collection_mtime(_effect_handler, util::parent_path(input->srcDataObjInp.objPath), now);
 
+        // If the source collection does not match the destination collection, this means a second collection
+        // is involved in the rename and will need it's mtime updated as well (e.g. imv col/dobj other_col/dobj).
         if (std::string{input->srcDataObjInp.objPath} != input->destDataObjInp.objPath) {
             util::update_collection_mtime(_effect_handler, util::parent_path(input->destDataObjInp.objPath), now);
         }
@@ -316,14 +321,14 @@ irods::error pep_api_data_obj_rename_post(std::list<boost::any>& _rule_arguments
 
 irods::error pep_api_data_obj_unlink_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
 {
-    rodsLog(LOG_NOTICE, ">>> pep_api_data_obj_unlink_post");
+    rodsLog(LOG_DEBUG, ">>> pep_api_data_obj_unlink_post");
 
     try
     {
         auto iter = std::begin(_rule_arguments);
         auto* input = boost::any_cast<dataObjInp_t*>(*std::next(iter, 2));
 
-        rodsLog(LOG_NOTICE, util::to_string(*input).c_str());
+        rodsLog(LOG_DEBUG, util::to_string(*input).c_str());
 
         util::update_collection_mtime(_effect_handler, util::parent_path(input->objPath));
     }
@@ -337,14 +342,14 @@ irods::error pep_api_data_obj_unlink_post(std::list<boost::any>& _rule_arguments
 
 irods::error pep_api_rm_coll_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
 {
-    rodsLog(LOG_NOTICE, ">>> pep_api_rm_coll_post");
+    rodsLog(LOG_DEBUG, ">>> pep_api_rm_coll_post");
 
     try
     {
         auto iter = std::begin(_rule_arguments);
         auto* input = boost::any_cast<collInp_t*>(*std::next(iter, 2));
 
-        rodsLog(LOG_NOTICE, util::to_string(*input).c_str());
+        rodsLog(LOG_DEBUG, util::to_string(*input).c_str());
 
         util::update_collection_mtime(_effect_handler, util::parent_path(input->collName));
     }
@@ -400,7 +405,10 @@ irods::error exec_rule(irods::default_re_ctx&,
         return (iter->second)(_rule_arguments, _effect_handler);
     }
 
-    rodsLog(LOG_ERROR, "[%s] not supported in rule engine", _rule_name.c_str());
+    rodsLog(LOG_ERROR,
+            "[irods_rule_engine_plugin-update_collection_mtime][rule => %s] "
+            "rule not supported in rule engine plugin",
+            _rule_name.c_str());
 
     return SUCCESS();
 }
