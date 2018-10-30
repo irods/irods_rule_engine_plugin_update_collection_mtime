@@ -8,6 +8,8 @@
 #include "dataObjInpOut.h"
 #include "rcMisc.h"
 #include "rsModColl.hpp"
+#include "rcMisc.h"
+#include "rodsError.h"
 
 #include <string>
 #include <array>
@@ -25,7 +27,7 @@ constexpr int timestamp_buffer_size = 15;
 
 // This is a "sorted" list of the supported PEPs.
 // This will allow us to do binary search on the list for lookups.
-const std::array<std::string, 7> peps{{
+constexpr std::array<const char*, 7> peps{{
     "pep_api_coll_create_post",
     "pep_api_data_obj_close_post",
     "pep_api_data_obj_close_pre",
@@ -36,6 +38,25 @@ const std::array<std::string, 7> peps{{
 }};
 
 namespace util {
+
+void concat_impl(std::string&)
+{
+}
+
+template <typename Head, typename ...Tail>
+void concat_impl(std::string& _dst, Head&& _head, Tail&&... _tail)
+{
+    _dst += std::forward<Head>(_head);
+    concat_impl(_dst, std::forward<Tail>(_tail)...);
+}
+
+template <typename ...Args>
+std::string concat(Args&&... _args)
+{
+    std::string result;
+    concat_impl(result, std::forward<Args>(_args)...);
+    return result;
+}
 
 ruleExecInfo_t& get_rei(irods::callback& _effect_handler)
 {
@@ -66,16 +87,26 @@ auto sudo(ruleExecInfo_t& _rei, Function _func) -> decltype(_func())
     return _func();
 }
 
+void log(int _log_level, const char* _msg, irods::callback& _effect_handler)
+{
+    rodsLog(_log_level, "%s", _msg);
+    addRErrorMsg(&get_rei(_effect_handler).rsComm->rError, RE_RUNTIME_ERROR, _msg);
+}
+
 void update_collection_mtime(irods::callback& _effect_handler,
                              const std::string& _path,
                              const char* _new_mtime = nullptr)
 {
     rodsLog(LOG_DEBUG, "updating collection mtime for [%s] ...", _path.c_str());
 
+    auto& rei = get_rei(_effect_handler);
+
     collInp_t input{};
 
     if (!rstrcpy(input.collName, _path.c_str(), MAX_NAME_LEN)) {
-        rodsLog(LOG_ERROR, "failed to copy path into update arguments [path => %s]", _path.c_str());
+        const auto msg = util::concat("failed to copy path string [path => ", _path.c_str(), ']');
+        rodsLog(LOG_ERROR, msg.c_str());
+        addRErrorMsg(&rei.rsComm->rError, RE_RUNTIME_ERROR, msg.c_str());
         return;
     }
 
@@ -88,14 +119,14 @@ void update_collection_mtime(irods::callback& _effect_handler,
         addKeyVal(&input.condInput, COLLECTION_MTIME_KW, now);
     }
 
-    auto& rei = get_rei(_effect_handler);
-
     const auto ec = sudo(rei, [&rei, &input] {
         return rsModColl(rei.rsComm, &input);
     });
 
     if (ec != 0) {
-        rodsLog(LOG_ERROR, "failed to update collection mtime for [%s] [error code => %d]", _path.c_str(), ec);
+        const auto msg = util::concat("failed to update collection mtime for [", _path.c_str(), "] [error code ==> ", ec, ']');
+        rodsLog(LOG_ERROR, msg.c_str());
+        addRErrorMsg(&rei.rsComm->rError, RE_RUNTIME_ERROR, msg.c_str());
     }
 }
 
@@ -186,7 +217,8 @@ irods::error pep_api_coll_create_post(std::list<boost::any>& _rule_arguments, ir
     }
     catch (const std::exception& e)
     {
-        rodsLog(LOG_ERROR, "%s", e.what());
+        util::log(LOG_ERROR, e.what(), _effect_handler);
+        return ERROR(RE_RUNTIME_ERROR, e.what());
     }
     
     return SUCCESS();
@@ -216,9 +248,11 @@ public:
         }
         catch (const std::exception& e)
         {
-            rodsLog(LOG_ERROR, "%s", e.what());
+            util::log(LOG_WARNING, e.what(), _effect_handler);
         }
         
+        // TODO Discuss what the proper solution is for handling errors in this
+        // "pre pep" handler. Should errors be ignored or bubble up?
         return SUCCESS();
     }
 
@@ -256,7 +290,8 @@ public:
         }
         catch (const std::exception& e)
         {
-            rodsLog(LOG_ERROR, "%s", e.what());
+            util::log(LOG_ERROR, e.what(), _effect_handler);
+            return ERROR(RE_RUNTIME_ERROR, e.what());
         }
         
         return SUCCESS();
@@ -283,7 +318,8 @@ irods::error pep_api_data_obj_put_post(std::list<boost::any>& _rule_arguments, i
     }
     catch (const std::exception& e)
     {
-        rodsLog(LOG_ERROR, "%s", e.what());
+        util::log(LOG_ERROR, e.what(), _effect_handler);
+        return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
     return SUCCESS();
@@ -313,7 +349,8 @@ irods::error pep_api_data_obj_rename_post(std::list<boost::any>& _rule_arguments
     }
     catch (const std::exception& e)
     {
-        rodsLog(LOG_ERROR, "%s", e.what());
+        util::log(LOG_ERROR, e.what(), _effect_handler);
+        return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
     return SUCCESS();
@@ -334,7 +371,8 @@ irods::error pep_api_data_obj_unlink_post(std::list<boost::any>& _rule_arguments
     }
     catch (const std::exception& e)
     {
-        rodsLog(LOG_ERROR, "%s", e.what());
+        util::log(LOG_ERROR, e.what(), _effect_handler);
+        return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
     return SUCCESS();
@@ -355,7 +393,8 @@ irods::error pep_api_rm_coll_post(std::list<boost::any>& _rule_arguments, irods:
     }
     catch (const std::exception& e)
     {
-        rodsLog(LOG_ERROR, "%s", e.what());
+        util::log(LOG_ERROR, e.what(), _effect_handler);
+        return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
     return SUCCESS();
@@ -372,7 +411,13 @@ using operation = std::function<irods::error(irods::default_re_ctx&, Args...)>;
 
 irods::error rule_exists(irods::default_re_ctx&, const std::string& _rule_name, bool& _exists)
 {
-    _exists = std::binary_search(std::begin(peps), std::end(peps), _rule_name);
+    auto b = std::cbegin(peps);
+    auto e = std::cend(peps);
+
+    _exists = std::binary_search(b, e, _rule_name.c_str(), [](const auto* _lhs, const auto* _rhs) {
+        return strcmp(_lhs, _rhs) < 0;
+    });
+
     return SUCCESS();
 }
 
