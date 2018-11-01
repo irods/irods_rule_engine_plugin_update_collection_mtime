@@ -124,7 +124,7 @@ void update_collection_mtime(irods::callback& _effect_handler,
     });
 
     if (ec != 0) {
-        const auto msg = util::concat("failed to update collection mtime for [", _path.c_str(), "] [error code ==> ", ec, ']');
+        const auto msg = util::concat("failed to update collection mtime for [", _path.c_str(), "][error code => ", ec, ']');
         rodsLog(LOG_ERROR, msg.c_str());
         addRErrorMsg(&rei.rsComm->rError, RE_RUNTIME_ERROR, msg.c_str());
     }
@@ -221,7 +221,7 @@ irods::error pep_api_coll_create_post(std::list<boost::any>& _rule_arguments, ir
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
     
-    return SUCCESS();
+    return ERROR(SYS_NOT_SUPPORTED, "");
 }
 
 class pep_api_data_obj_close
@@ -253,7 +253,7 @@ public:
         
         // TODO Discuss what the proper solution is for handling errors in this
         // "pre pep" handler. Should errors be ignored or bubble up?
-        return SUCCESS();
+        return ERROR(SYS_NOT_SUPPORTED, "");
     }
 
     static irods::error post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
@@ -294,7 +294,7 @@ public:
             return ERROR(RE_RUNTIME_ERROR, e.what());
         }
         
-        return SUCCESS();
+        return ERROR(SYS_NOT_SUPPORTED, "");
     }
 
 private:
@@ -322,7 +322,7 @@ irods::error pep_api_data_obj_put_post(std::list<boost::any>& _rule_arguments, i
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return SUCCESS();
+    return ERROR(SYS_NOT_SUPPORTED, "");
 }
 
 irods::error pep_api_data_obj_rename_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
@@ -353,7 +353,7 @@ irods::error pep_api_data_obj_rename_post(std::list<boost::any>& _rule_arguments
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return SUCCESS();
+    return ERROR(SYS_NOT_SUPPORTED, "");
 }
 
 irods::error pep_api_data_obj_unlink_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
@@ -375,7 +375,7 @@ irods::error pep_api_data_obj_unlink_post(std::list<boost::any>& _rule_arguments
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return SUCCESS();
+    return ERROR(SYS_NOT_SUPPORTED, "");
 }
 
 irods::error pep_api_rm_coll_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
@@ -397,7 +397,7 @@ irods::error pep_api_rm_coll_post(std::list<boost::any>& _rule_arguments, irods:
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return SUCCESS();
+    return ERROR(SYS_NOT_SUPPORTED, "");
 }
 
 } // namespace handler
@@ -450,12 +450,13 @@ irods::error exec_rule(irods::default_re_ctx&,
         return (iter->second)(_rule_arguments, _effect_handler);
     }
 
-    rodsLog(LOG_ERROR,
-            "[irods_rule_engine_plugin-update_collection_mtime][rule => %s] "
-            "rule not supported in rule engine plugin",
-            _rule_name.c_str());
+    const auto* msg = "[irods_rule_engine_plugin-update_collection_mtime][rule => %s] "
+                      "rule not supported in rule engine plugin";
 
-    return SUCCESS();
+    rodsLog(LOG_ERROR, msg, _rule_name.c_str());
+
+    // DO NOT BLOCK RULE ENGINE PLUGINS THAT FOLLOW THIS ONE!
+    return ERROR(SYS_NOT_SUPPORTED, msg);
 }
 
 } // namespace (anonymous)
