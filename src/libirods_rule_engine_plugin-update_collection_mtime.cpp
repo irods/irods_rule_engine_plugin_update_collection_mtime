@@ -37,6 +37,8 @@ constexpr std::array<const char*, 7> peps{{
     "pep_api_rm_coll_post"
 }};
 
+const char* fall_through_msg = "fall through";
+
 namespace util {
 
 void concat_impl(std::string&)
@@ -87,9 +89,9 @@ auto sudo(ruleExecInfo_t& _rei, Function _func) -> decltype(_func())
     return _func();
 }
 
-void log(int _log_level, const char* _msg, irods::callback& _effect_handler)
+void log_exception_message(const char* _msg, irods::callback& _effect_handler)
 {
-    rodsLog(_log_level, "%s", _msg);
+    rodsLog(LOG_ERROR, "%s", _msg);
     addRErrorMsg(&get_rei(_effect_handler).rsComm->rError, RE_RUNTIME_ERROR, _msg);
 }
 
@@ -97,14 +99,12 @@ void update_collection_mtime(irods::callback& _effect_handler,
                              const std::string& _path,
                              const char* _new_mtime = nullptr)
 {
-    rodsLog(LOG_DEBUG, "updating collection mtime for [%s] ...", _path.c_str());
-
     auto& rei = get_rei(_effect_handler);
 
     collInp_t input{};
 
     if (!rstrcpy(input.collName, _path.c_str(), MAX_NAME_LEN)) {
-        const auto msg = util::concat("failed to copy path string [path => ", _path.c_str(), ']');
+        const auto msg = util::concat("failed to copy path string into input buffer [path => ", _path.c_str(), ']');
         rodsLog(LOG_ERROR, msg.c_str());
         addRErrorMsg(&rei.rsComm->rError, RE_RUNTIME_ERROR, msg.c_str());
         return;
@@ -124,7 +124,7 @@ void update_collection_mtime(irods::callback& _effect_handler,
     });
 
     if (ec != 0) {
-        const auto msg = util::concat("failed to update collection mtime for [", _path.c_str(), "][error code => ", ec, ']');
+        const auto msg = util::concat("failed to update collection mtime [path => ", _path.c_str(), "][error code => ", ec, ']');
         rodsLog(LOG_ERROR, msg.c_str());
         addRErrorMsg(&rei.rsComm->rError, RE_RUNTIME_ERROR, msg.c_str());
     }
@@ -136,62 +136,49 @@ std::string parent_path(const char* _path)
     return fs::path{_path}.parent_path().generic_string();
 }
 
+template <typename T>
+T* get_input_object_ptr(std::list<boost::any>& _rule_arguments)
+{
+    return boost::any_cast<T*>(*std::next(std::begin(_rule_arguments), 2));
+}
+
 std::string to_string(const collInp_t& _input)
 {
-    std::string output = "collInp_t {collName: ";
-    output += _input.collName;
-    output += '}';
-
-    return output;
+    return util::concat("collInp_t {collName: ", _input.collName, '}');
 }
 
 std::string to_string(const openedDataObjInp_t& _input)
 {
-    std::string output = "openedDataObjInp_t {";
-    output += "l1descInx: ";
-    output += std::to_string(_input.l1descInx);
-    output += ", len: ";
-    output += std::to_string(_input.len);
-    output += ", oprType: ";
-    output += std::to_string(_input.oprType);
-    output += ", bytesWritten: ";
-    output += std::to_string(_input.bytesWritten);
-    output += '}';
+    const auto fd = std::to_string(_input.l1descInx);
+    const auto len = std::to_string(_input.len);
+    const auto op_type = std::to_string(_input.oprType);
+    const auto bytes = std::to_string(_input.bytesWritten);
 
-    return output;
+    return util::concat("openedDataObjInp_t {l1descInx: ", fd, 
+                        ", len: ", len, 
+                        ", oprType: ", op_type, 
+                        ", bytesWritten: ", bytes, '}');
 }
 
 std::string to_string(const dataObjInp_t& _input)
 {
-    std::string output = "dataObjInp_t {objPath: ";
-    output += _input.objPath;
-    output += '}';
-
-    return output;
+    return util::concat("dataObjInp_t {objPath: ", _input.objPath, '}');
 }
 
 std::string to_string(const dataObjCopyInp_t& _input)
 {
-    std::string output = "dataObjCopyInp_t {";
-    output += "srcDataObjInp.objPath: ";
-    output += _input.srcDataObjInp.objPath;
-    output += ", destDataObjInp.objPath: ";
-    output += _input.destDataObjInp.objPath;
-    output += '}';
+    const auto* src = _input.srcDataObjInp.objPath;
+    const auto* dst = _input.destDataObjInp.objPath;
 
-    return output;
+    return util::concat("dataObjCopyInp_t {srcDataObjInp.objPath: ", src, ", destDataObjInp.objPath: ", dst, '}');
 }
 
 std::string to_string(const l1desc& _input)
 {
-    std::string output = "l1desc {";
-    output += "dataObjInp->objPath: ";
-    output += _input.dataObjInp->objPath;
-    output += ", bytesWritten: ";
-    output += std::to_string(_input.bytesWritten);
-    output += '}';
+    const auto* path = _input.dataObjInp->objPath;
+    const auto bytes = std::to_string(_input.bytesWritten);
 
-    return output;
+    return util::concat("l1desc {dataObjInp->objPath: ", path, ", bytesWritten: ", bytes, '}');
 }
 
 } // namespace util
@@ -204,24 +191,21 @@ namespace handler {
 
 irods::error pep_api_coll_create_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
 {
-    rodsLog(LOG_DEBUG, ">>> pep_api_coll_create_post");
-
     try
     {
-        auto iter = std::begin(_rule_arguments);
-        auto* input = boost::any_cast<collInp_t*>(*std::next(iter, 2));
+        auto* input = util::get_input_object_ptr<collInp_t>(_rule_arguments);
 
-        rodsLog(LOG_DEBUG, util::to_string(*input).c_str());
+        rodsLog(LOG_DEBUG, "%s - input args => %s", __func__, util::to_string(*input).c_str());
 
         util::update_collection_mtime(_effect_handler, util::parent_path(input->collName));
     }
     catch (const std::exception& e)
     {
-        util::log(LOG_ERROR, e.what(), _effect_handler);
+        util::log_exception_message(e.what(), _effect_handler);
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
     
-    return ERROR(SYS_NOT_SUPPORTED, "");
+    return ERROR(SYS_NOT_SUPPORTED, fall_through_msg);
 }
 
 class pep_api_data_obj_close
@@ -231,14 +215,11 @@ public:
 
     static irods::error pre(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
     {
-        rodsLog(LOG_DEBUG, ">>> pep_api_data_obj_close_pre");
-
         try
         {
-            auto iter = std::begin(_rule_arguments);
-            auto* input = boost::any_cast<openedDataObjInp_t*>(*std::next(iter, 2));
+            auto* input = util::get_input_object_ptr<openedDataObjInp_t>(_rule_arguments);
 
-            rodsLog(LOG_DEBUG, util::to_string(*input).c_str());
+            rodsLog(LOG_DEBUG, "%s - input args => %s", __func__, util::to_string(*input).c_str());
 
             const auto& desc = irods::get_l1desc(input->l1descInx);
 
@@ -248,18 +229,18 @@ public:
         }
         catch (const std::exception& e)
         {
-            util::log(LOG_WARNING, e.what(), _effect_handler);
+            util::log_exception_message(e.what(), _effect_handler);
+
+            // TODO Discuss what the proper solution is for handling errors in this
+            // "pre pep" handler. Should errors be ignored or bubble up?
+            return ERROR(RE_RUNTIME_ERROR, e.what());
         }
         
-        // TODO Discuss what the proper solution is for handling errors in this
-        // "pre pep" handler. Should errors be ignored or bubble up?
-        return ERROR(SYS_NOT_SUPPORTED, "");
+        return ERROR(SYS_NOT_SUPPORTED, fall_through_msg);
     }
 
     static irods::error post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
     {
-        rodsLog(LOG_DEBUG, ">>> pep_api_data_obj_close_post");
-
         static constexpr std::array<int, 11> unsupported_operations{{
             DONE_OPR,
             GET_OPR,
@@ -276,10 +257,9 @@ public:
 
         try
         {
-            auto iter = std::begin(_rule_arguments);
-            auto* input = boost::any_cast<openedDataObjInp_t*>(*std::next(iter, 2));
+            auto* input = util::get_input_object_ptr<openedDataObjInp_t>(_rule_arguments);
 
-            rodsLog(LOG_DEBUG, util::to_string(*input).c_str());
+            rodsLog(LOG_DEBUG, "%s - input args => %s", __func__, util::to_string(*input).c_str());
 
             auto b = std::cbegin(unsupported_operations);
             auto e = std::cend(unsupported_operations);
@@ -290,11 +270,11 @@ public:
         }
         catch (const std::exception& e)
         {
-            util::log(LOG_ERROR, e.what(), _effect_handler);
+            util::log_exception_message(e.what(), _effect_handler);
             return ERROR(RE_RUNTIME_ERROR, e.what());
         }
         
-        return ERROR(SYS_NOT_SUPPORTED, "");
+        return ERROR(SYS_NOT_SUPPORTED, fall_through_msg);
     }
 
 private:
@@ -305,36 +285,30 @@ std::string pep_api_data_obj_close::logical_path_{};
 
 irods::error pep_api_data_obj_put_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
 {
-    rodsLog(LOG_DEBUG, ">>> pep_api_data_obj_put_post");
-
     try
     {
-        auto iter = std::begin(_rule_arguments);
-        auto* input = boost::any_cast<dataObjInp_t*>(*std::next(iter, 2));
+        auto* input = util::get_input_object_ptr<dataObjInp_t>(_rule_arguments);
 
-        rodsLog(LOG_DEBUG, util::to_string(*input).c_str());
+        rodsLog(LOG_DEBUG, "%s - input args => %s", __func__, util::to_string(*input).c_str());
 
         util::update_collection_mtime(_effect_handler, util::parent_path(input->objPath));
     }
     catch (const std::exception& e)
     {
-        util::log(LOG_ERROR, e.what(), _effect_handler);
+        util::log_exception_message(e.what(), _effect_handler);
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return ERROR(SYS_NOT_SUPPORTED, "");
+    return ERROR(SYS_NOT_SUPPORTED, fall_through_msg);
 }
 
 irods::error pep_api_data_obj_rename_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
 {
-    rodsLog(LOG_DEBUG, ">>> pep_api_data_obj_rename_post");
-
     try
     {
-        auto iter = std::begin(_rule_arguments);
-        auto* input = boost::any_cast<dataObjCopyInp_t*>(*std::next(iter, 2));
+        auto* input = util::get_input_object_ptr<dataObjCopyInp_t>(_rule_arguments);
 
-        rodsLog(LOG_DEBUG, util::to_string(*input).c_str());
+        rodsLog(LOG_DEBUG, "%s - input args => %s", __func__, util::to_string(*input).c_str());
 
         char now[timestamp_buffer_size];
         getNowStr(now);
@@ -349,55 +323,49 @@ irods::error pep_api_data_obj_rename_post(std::list<boost::any>& _rule_arguments
     }
     catch (const std::exception& e)
     {
-        util::log(LOG_ERROR, e.what(), _effect_handler);
+        util::log_exception_message(e.what(), _effect_handler);
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return ERROR(SYS_NOT_SUPPORTED, "");
+    return ERROR(SYS_NOT_SUPPORTED, fall_through_msg);
 }
 
 irods::error pep_api_data_obj_unlink_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
 {
-    rodsLog(LOG_DEBUG, ">>> pep_api_data_obj_unlink_post");
-
     try
     {
-        auto iter = std::begin(_rule_arguments);
-        auto* input = boost::any_cast<dataObjInp_t*>(*std::next(iter, 2));
+        auto* input = util::get_input_object_ptr<dataObjInp_t>(_rule_arguments);
 
-        rodsLog(LOG_DEBUG, util::to_string(*input).c_str());
+        rodsLog(LOG_DEBUG, "%s - input args => %s", __func__, util::to_string(*input).c_str());
 
         util::update_collection_mtime(_effect_handler, util::parent_path(input->objPath));
     }
     catch (const std::exception& e)
     {
-        util::log(LOG_ERROR, e.what(), _effect_handler);
+        util::log_exception_message(e.what(), _effect_handler);
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return ERROR(SYS_NOT_SUPPORTED, "");
+    return ERROR(SYS_NOT_SUPPORTED, fall_through_msg);
 }
 
 irods::error pep_api_rm_coll_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
 {
-    rodsLog(LOG_DEBUG, ">>> pep_api_rm_coll_post");
-
     try
     {
-        auto iter = std::begin(_rule_arguments);
-        auto* input = boost::any_cast<collInp_t*>(*std::next(iter, 2));
+        auto* input = util::get_input_object_ptr<collInp_t>(_rule_arguments);
 
-        rodsLog(LOG_DEBUG, util::to_string(*input).c_str());
+        rodsLog(LOG_DEBUG, "%s - input args => %s", __func__, util::to_string(*input).c_str());
 
         util::update_collection_mtime(_effect_handler, util::parent_path(input->collName));
     }
     catch (const std::exception& e)
     {
-        util::log(LOG_ERROR, e.what(), _effect_handler);
+        util::log_exception_message(e.what(), _effect_handler);
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return ERROR(SYS_NOT_SUPPORTED, "");
+    return ERROR(SYS_NOT_SUPPORTED, fall_through_msg);
 }
 
 } // namespace handler
@@ -471,7 +439,7 @@ pluggable_rule_engine* plugin_factory(const std::string& _instance_name,
 {
     // clang-format off
     const auto no_op         = [] { return SUCCESS(); };
-    const auto not_supported = [] { return ERROR(SYS_NOT_SUPPORTED, "Not supported"); };
+    const auto not_supported = [] { return ERROR(SYS_NOT_SUPPORTED, "not supported"); };
     // clang-format on
 
     auto* re = new pluggable_rule_engine{_instance_name, _context};
