@@ -37,7 +37,7 @@ constexpr std::array<const char*, 7> peps{{
     "pep_api_rm_coll_post"
 }};
 
-const char* fall_through_msg = "fall through";
+const char* continuation_msg = "";
 
 namespace util {
 
@@ -205,7 +205,7 @@ irods::error pep_api_coll_create_post(std::list<boost::any>& _rule_arguments, ir
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
     
-    return ERROR(SYS_NOT_SUPPORTED, fall_through_msg);
+    return ERROR(RULE_ENGINE_CONTINUE, continuation_msg);
 }
 
 class pep_api_data_obj_close
@@ -236,7 +236,7 @@ public:
             return ERROR(RE_RUNTIME_ERROR, e.what());
         }
         
-        return ERROR(SYS_NOT_SUPPORTED, fall_through_msg);
+        return ERROR(RULE_ENGINE_CONTINUE, continuation_msg);
     }
 
     static irods::error post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
@@ -274,7 +274,7 @@ public:
             return ERROR(RE_RUNTIME_ERROR, e.what());
         }
         
-        return ERROR(SYS_NOT_SUPPORTED, fall_through_msg);
+        return ERROR(RULE_ENGINE_CONTINUE, continuation_msg);
     }
 
 private:
@@ -299,7 +299,7 @@ irods::error pep_api_data_obj_put_post(std::list<boost::any>& _rule_arguments, i
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return ERROR(SYS_NOT_SUPPORTED, fall_through_msg);
+    return ERROR(RULE_ENGINE_CONTINUE, continuation_msg);
 }
 
 irods::error pep_api_data_obj_rename_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
@@ -327,7 +327,7 @@ irods::error pep_api_data_obj_rename_post(std::list<boost::any>& _rule_arguments
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return ERROR(SYS_NOT_SUPPORTED, fall_through_msg);
+    return ERROR(RULE_ENGINE_CONTINUE, continuation_msg);
 }
 
 irods::error pep_api_data_obj_unlink_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
@@ -346,7 +346,7 @@ irods::error pep_api_data_obj_unlink_post(std::list<boost::any>& _rule_arguments
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return ERROR(SYS_NOT_SUPPORTED, fall_through_msg);
+    return ERROR(RULE_ENGINE_CONTINUE, continuation_msg);
 }
 
 irods::error pep_api_rm_coll_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
@@ -365,7 +365,7 @@ irods::error pep_api_rm_coll_post(std::list<boost::any>& _rule_arguments, irods:
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return ERROR(SYS_NOT_SUPPORTED, fall_through_msg);
+    return ERROR(RULE_ENGINE_CONTINUE, continuation_msg);
 }
 
 } // namespace handler
@@ -424,7 +424,7 @@ irods::error exec_rule(irods::default_re_ctx&,
     rodsLog(LOG_ERROR, msg, _rule_name.c_str());
 
     // DO NOT BLOCK RULE ENGINE PLUGINS THAT FOLLOW THIS ONE!
-    return ERROR(SYS_NOT_SUPPORTED, msg);
+    return ERROR(RULE_ENGINE_CONTINUE, msg);
 }
 
 } // namespace (anonymous)
