@@ -8,8 +8,8 @@ import time
 import irods_python_ci_utilities
 
 def install_cmake_and_add_to_front_of_path():
-    irods_python_ci_utilities.install_os_packages(['irods-externals-cmake3.11.4-0'])
-    os.environ['PATH'] = '/opt/irods-externals/cmake3.11.4-0/bin' + os.pathsep + os.environ['PATH']
+    irods_python_ci_utilities.install_os_packages(['irods-externals-cmake3.5.2-0'])
+    os.environ['PATH'] = '/opt/irods-externals/cmake3.5.2-0/bin' + os.pathsep + os.environ['PATH']
 
 def get_build_prerequisites_all():
     return []
