@@ -7,10 +7,6 @@ import glob
 import time
 import irods_python_ci_utilities
 
-def install_cmake_and_add_to_front_of_path():
-    irods_python_ci_utilities.install_os_packages(['irods-externals-cmake3.5.2-0'])
-    os.environ['PATH'] = '/opt/irods-externals/cmake3.5.2-0/bin' + os.pathsep + os.environ['PATH']
-
 def get_build_prerequisites_all():
     return []
 
@@ -38,7 +34,6 @@ def install_build_prerequisites_apt():
             irods_python_ci_utilities.install_os_packages(['python-software-properties'])
             irods_python_ci_utilities.subprocess_get_output(['sudo', 'add-apt-repository', '-y', 'ppa:ubuntu-toolchain-r/test'], check_rc=True)
             irods_python_ci_utilities.install_os_packages(['libstdc++6'])
-    irods_python_ci_utilities.install_os_packages(get_build_prerequisites())
 
 def install_build_prerequisites_yum():
     irods_python_ci_utilities.install_os_packages(get_build_prerequisites())
@@ -70,8 +65,6 @@ def main():
     irods_python_ci_utilities.install_os_packages_from_files(glob.glob(os.path.join(os_specific_directory, 'irods-rule-engine-plugin-update-collection-mtime*.{0}'.format(package_suffix))))
 
     irods_python_ci_utilities.install_irods_core_dev_repository()
-    install_cmake_and_add_to_front_of_path()
-    install_build_prerequisites()
 
     time.sleep(10)
 
