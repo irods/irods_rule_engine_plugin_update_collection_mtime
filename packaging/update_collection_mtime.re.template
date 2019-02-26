@@ -1,0 +1,25 @@
+# This template defines all PEPs handled by the MTime REP that trigger continuation in the
+# Rule Engine Plugin Framework. This file is provided to keep errors from being generated
+# when using the MTime REP.
+#
+# If your iRODS deployment defines these PEPs already, then usage of this rulebase
+# is not needed.
+#
+# To use:
+#     1. Copy this template and remove the ".template" extension.
+#     2. Add the new rulebase file to the Native REP's "re_rulebase_set" list.
+#
+# For more information about this file, see the "Configuration" section of
+# the README located at the following:
+#
+#     https://github.com/irods/irods_rule_engine_plugin_update_collection_mtime
+#
+
+pep_api_coll_create_post(*INSTANCE_NAME, *COMM, *INPUT) {}
+pep_api_data_obj_close_post(*INSTANCE_NAME, *COMM, *INPUT) {}
+pep_api_data_obj_close_pre(*INSTANCE_NAME, *COMM, *INPUT) {}
+pep_api_data_obj_put_post(*INSTANCE_NAME, *COMM, *INPUT, *BYTESBUF_INPUT, *OUTPUT) {}
+pep_api_data_obj_rename_post(*INSTANCE_NAME, *COMM, *INPUT) {}
+pep_api_data_obj_unlink_post(*INSTANCE_NAME, *COMM, *INPUT) {}
+pep_api_rm_coll_post(*INSTANCE_NAME, *COMM, *INPUT, *OPR_STAT) {}
+
