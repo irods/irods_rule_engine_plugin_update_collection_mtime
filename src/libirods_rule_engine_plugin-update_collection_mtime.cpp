@@ -438,19 +438,19 @@ pluggable_rule_engine* plugin_factory(const std::string& _instance_name,
                                       const std::string& _context)
 {
     // clang-format off
-    const auto no_op         = [] { return SUCCESS(); };
-    const auto not_supported = [] { return ERROR(SYS_NOT_SUPPORTED, "not supported"); };
+    const auto no_op         = [](auto...) { return SUCCESS(); };
+    const auto not_supported = [](auto...) { return ERROR(SYS_NOT_SUPPORTED, "not supported"); };
     // clang-format on
 
     auto* re = new pluggable_rule_engine{_instance_name, _context};
 
-    re->add_operation("start", {no_op});
-    re->add_operation("stop", {no_op});
+    re->add_operation("start", operation<const std::string&>{no_op});
+    re->add_operation("stop", operation<const std::string&>{no_op});
     re->add_operation("rule_exists", operation<const std::string&, bool&>{rule_exists});
     re->add_operation("list_rules", operation<std::vector<std::string>&>{list_rules});
     re->add_operation("exec_rule", operation<const std::string&, std::list<boost::any>&, irods::callback>{exec_rule});
-    re->add_operation("exec_rule_text", {not_supported});
-    re->add_operation("exec_rule_expression", {not_supported});
+    re->add_operation("exec_rule_text", operation<const std::string&, msParamArray_t*, const std::string&, irods::callback>{not_supported});
+    re->add_operation("exec_rule_expression", operation<const std::string&, msParamArray_t*, const std::string&, irods::callback>{not_supported});
 
     return re;
 }
