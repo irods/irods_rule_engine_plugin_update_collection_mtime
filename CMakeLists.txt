@@ -63,6 +63,14 @@ install(FILES ${CMAKE_SOURCE_DIR}/packaging/run_update_collection_mtime_test.py
         DESTINATION ${IRODS_HOME_DIRECTORY}/scripts
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
 
+install(FILES ${CMAKE_SOURCE_DIR}/packaging/update_collection_mtime.re.template
+        DESTINATION /etc/irods
+        PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+
+install(FILES ${CMAKE_SOURCE_DIR}/packaging/update_collection_mtime.py.template
+        DESTINATION /etc/irods
+        PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+
 set(PLUGIN_PACKAGE_NAME irods-rule-engine-plugin-update-collection-mtime)
 
 set(IRODS_PLUGIN_VERSION_MAJOR ${PLUGIN_VERSION_MAJOR})
