@@ -34,9 +34,9 @@ set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -stdlib=libc++ -Wl,-
 
 set(PLUGIN irods_rule_engine_plugin-update_collection_mtime)
 
-set(PLUGIN_VERSION_MAJOR 0)
+set(PLUGIN_VERSION_MAJOR 1)
 set(PLUGIN_VERSION_MINOR 0)
-set(PLUGIN_VERSION_PATCH 1)
+set(PLUGIN_VERSION_PATCH 0)
 set(PLUGIN_VERSION "${PLUGIN_VERSION_MAJOR}.${PLUGIN_VERSION_MINOR}.${PLUGIN_VERSION_PATCH}")
 
 add_library(${PLUGIN} MODULE ${CMAKE_SOURCE_DIR}/src/libirods_rule_engine_plugin-update_collection_mtime.cpp)
