@@ -35,7 +35,6 @@ class Test_Rule_Engine_Plugin_Update_Collection_MTime(session.make_sessions_mixi
             self.run_collection_pep_tests()
             self.run_data_object_pep_tests()
             self.run_irule_tests(config.server_config['plugin_configuration']['rule_engines'])
-            self.cleanup()
 
     def enable_mtime_rep(self, config):
         # Add the MTime REP to the beginning of the rule engines list.
@@ -45,39 +44,28 @@ class Test_Rule_Engine_Plugin_Update_Collection_MTime(session.make_sessions_mixi
             'plugin_specific_configuration': {}
         })
 
-        native_rep = 'irods_rule_engine_plugin-irods_rule_language'
-
-        # Iterate over the rule engines until we find the NREP.
-        # Once the NREP is found, create a copy of the rulebase template (without the ".template"
-        # extension) and add it to the rulebase set of the NREP.
-        for re in config.server_config['plugin_configuration']['rule_engines']:
-            if re['plugin_name'] == native_rep:
-                # Add the NREP rulebase template to the "re_rulebase_set" list.
-                rulebase = os.path.join(paths.config_directory(), 'update_collection_mtime')
-                shutil.copyfile(rulebase + '.re.template', rulebase + '.re')
-                re['plugin_specific_configuration']['re_rulebase_set'] = ['core', 'update_collection_mtime']
-                break
-
         # Save the changes.
         lib.update_json_file_from_dict(config.server_config_path, config.server_config)
 
-    def cleanup(self):
-        rulebase = os.path.join(paths.config_directory(), 'update_collection_mtime')
-        os.remove(rulebase + '.re')
-
     def run_collection_pep_tests(self):
         collection = 'rep_mtime_col.d'
+        copied_collection = 'rep_mtime_col.copied.d'
 
         self.run_create_collection_test(collection)
+        self.run_copy_collection_test(collection, copied_collection)
         self.run_remove_collection_test(collection)
 
     def run_data_object_pep_tests(self):
         filename = 'rep_mtime_file.txt'
         new_filename = 'rep_mtime_file.renamed.txt'
+        copied_filename = 'rep_mtime_file.copied.txt'
 
         self.run_put_data_object_test(filename)
         self.run_rename_data_object_test(filename, new_filename)
+        self.run_copy_data_object_test(new_filename, copied_filename)
         self.run_remove_data_object_test(new_filename)
+
+        os.remove(filename)
 
     def run_irule_tests(self, rule_engines):
         native_rep = 'irods_rule_engine_plugin-irods_rule_language'
@@ -91,20 +79,26 @@ class Test_Rule_Engine_Plugin_Update_Collection_MTime(session.make_sessions_mixi
                 break
 
     def run_create_collection_test(self, collection):
-        self.run_test(lambda: self.admin.run_icommand('imkdir {0}'.format(collection)))
+        self.run_test(lambda: self.admin.run_icommand(['imkdir', collection]))
+
+    def run_copy_collection_test(self, src_collection, dst_collection):
+        self.run_test(lambda: self.admin.run_icommand(['icp', src_collection, dst_collection]))
 
     def run_remove_collection_test(self, collection):
-        self.run_test(lambda: self.admin.run_icommand('irmdir {0}'.format(collection)))
+        self.run_test(lambda: self.admin.run_icommand(['irmdir', collection]))
 
     def run_put_data_object_test(self, filename):
         lib.make_file(filename, 1)
-        self.run_test(lambda: self.admin.run_icommand('iput {0}'.format(filename)))
+        self.run_test(lambda: self.admin.run_icommand(['iput', filename]))
 
     def run_rename_data_object_test(self, filename, new_filename):
-        self.run_test(lambda: self.admin.run_icommand('imv {0} {1}'.format(filename, new_filename)))
+        self.run_test(lambda: self.admin.run_icommand(['imv', filename, new_filename]))
+
+    def run_copy_data_object_test(self, src_filename, dst_filename):
+        self.run_test(lambda: self.admin.run_icommand(['icp', src_filename, dst_filename]))
 
     def run_remove_data_object_test(self, filename):
-        self.run_test(lambda: self.admin.run_icommand('irm -f {0}'.format(filename)))
+        self.run_test(lambda: self.admin.run_icommand(['irm', '-f', filename]))
 
     def run_test(self, trigger_mtime_update_func):
         old_mtime = self.get_mtime(self.admin.session_collection)
