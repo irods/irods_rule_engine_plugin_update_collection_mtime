@@ -27,17 +27,16 @@ constexpr int timestamp_buffer_size = 15;
 
 // This is a "sorted" list of the supported PEPs.
 // This will allow us to do binary search on the list for lookups.
-constexpr std::array<const char*, 7> peps{{
+constexpr std::array<const char*, 8> peps{{
     "pep_api_coll_create_post",
     "pep_api_data_obj_close_post",
     "pep_api_data_obj_close_pre",
+    "pep_api_data_obj_copy_post",
     "pep_api_data_obj_put_post",
     "pep_api_data_obj_rename_post",
     "pep_api_data_obj_unlink_post",
     "pep_api_rm_coll_post"
 }};
-
-const char* continuation_msg = "";
 
 namespace util {
 
@@ -205,7 +204,7 @@ irods::error pep_api_coll_create_post(std::list<boost::any>& _rule_arguments, ir
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
     
-    return ERROR(RULE_ENGINE_CONTINUE, continuation_msg);
+    return CODE(RULE_ENGINE_CONTINUE);
 }
 
 class pep_api_data_obj_close
@@ -236,7 +235,7 @@ public:
             return ERROR(RE_RUNTIME_ERROR, e.what());
         }
         
-        return ERROR(RULE_ENGINE_CONTINUE, continuation_msg);
+        return CODE(RULE_ENGINE_CONTINUE);
     }
 
     static irods::error post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
@@ -274,7 +273,7 @@ public:
             return ERROR(RE_RUNTIME_ERROR, e.what());
         }
         
-        return ERROR(RULE_ENGINE_CONTINUE, continuation_msg);
+        return CODE(RULE_ENGINE_CONTINUE);
     }
 
 private:
@@ -282,6 +281,25 @@ private:
 }; // pep_api_data_obj_close
 
 std::string pep_api_data_obj_close::logical_path_{};
+
+irods::error pep_api_data_obj_copy_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
+{
+    try
+    {
+        auto* input = util::get_input_object_ptr<dataObjCopyInp_t>(_rule_arguments);
+
+        rodsLog(LOG_DEBUG, "%s - input args => %s", __func__, util::to_string(*input).c_str());
+
+        util::update_collection_mtime(_effect_handler, util::parent_path(input->destDataObjInp.objPath));
+    }
+    catch (const std::exception& e)
+    {
+        util::log_exception_message(e.what(), _effect_handler);
+        return ERROR(RE_RUNTIME_ERROR, e.what());
+    }
+
+    return CODE(RULE_ENGINE_CONTINUE);
+}
 
 irods::error pep_api_data_obj_put_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
 {
@@ -299,7 +317,7 @@ irods::error pep_api_data_obj_put_post(std::list<boost::any>& _rule_arguments, i
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return ERROR(RULE_ENGINE_CONTINUE, continuation_msg);
+    return CODE(RULE_ENGINE_CONTINUE);
 }
 
 irods::error pep_api_data_obj_rename_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
@@ -313,12 +331,15 @@ irods::error pep_api_data_obj_rename_post(std::list<boost::any>& _rule_arguments
         char now[timestamp_buffer_size];
         getNowStr(now);
 
-        util::update_collection_mtime(_effect_handler, util::parent_path(input->srcDataObjInp.objPath), now);
+        const auto src_parent_path = util::parent_path(input->srcDataObjInp.objPath);
+        const auto dst_parent_path = util::parent_path(input->destDataObjInp.objPath);
+
+        util::update_collection_mtime(_effect_handler, src_parent_path, now);
 
         // If the source collection does not match the destination collection, this means a second collection
         // is involved in the rename and will need it's mtime updated as well (e.g. imv col/dobj other_col/dobj).
-        if (std::string{input->srcDataObjInp.objPath} != input->destDataObjInp.objPath) {
-            util::update_collection_mtime(_effect_handler, util::parent_path(input->destDataObjInp.objPath), now);
+        if (src_parent_path != dst_parent_path) {
+            util::update_collection_mtime(_effect_handler, dst_parent_path, now);
         }
     }
     catch (const std::exception& e)
@@ -327,7 +348,7 @@ irods::error pep_api_data_obj_rename_post(std::list<boost::any>& _rule_arguments
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return ERROR(RULE_ENGINE_CONTINUE, continuation_msg);
+    return CODE(RULE_ENGINE_CONTINUE);
 }
 
 irods::error pep_api_data_obj_unlink_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
@@ -346,7 +367,7 @@ irods::error pep_api_data_obj_unlink_post(std::list<boost::any>& _rule_arguments
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return ERROR(RULE_ENGINE_CONTINUE, continuation_msg);
+    return CODE(RULE_ENGINE_CONTINUE);
 }
 
 irods::error pep_api_rm_coll_post(std::list<boost::any>& _rule_arguments, irods::callback& _effect_handler)
@@ -365,7 +386,7 @@ irods::error pep_api_rm_coll_post(std::list<boost::any>& _rule_arguments, irods:
         return ERROR(RE_RUNTIME_ERROR, e.what());
     }
 
-    return ERROR(RULE_ENGINE_CONTINUE, continuation_msg);
+    return CODE(RULE_ENGINE_CONTINUE);
 }
 
 } // namespace handler
@@ -406,10 +427,11 @@ irods::error exec_rule(irods::default_re_ctx&,
         {peps[0], handler::pep_api_coll_create_post},
         {peps[1], handler::pep_api_data_obj_close::post},
         {peps[2], handler::pep_api_data_obj_close::pre},
-        {peps[3], handler::pep_api_data_obj_put_post},
-        {peps[4], handler::pep_api_data_obj_rename_post},
-        {peps[5], handler::pep_api_data_obj_unlink_post},
-        {peps[6], handler::pep_api_rm_coll_post}
+        {peps[3], handler::pep_api_data_obj_copy_post},
+        {peps[4], handler::pep_api_data_obj_put_post},
+        {peps[5], handler::pep_api_data_obj_rename_post},
+        {peps[6], handler::pep_api_data_obj_unlink_post},
+        {peps[7], handler::pep_api_rm_coll_post}
     };
 
     auto iter = handlers.find(_rule_name);
@@ -424,7 +446,7 @@ irods::error exec_rule(irods::default_re_ctx&,
     rodsLog(LOG_ERROR, msg, _rule_name.c_str());
 
     // DO NOT BLOCK RULE ENGINE PLUGINS THAT FOLLOW THIS ONE!
-    return ERROR(RULE_ENGINE_CONTINUE, msg);
+    return CODE(RULE_ENGINE_CONTINUE);
 }
 
 } // namespace (anonymous)
@@ -439,7 +461,7 @@ pluggable_rule_engine* plugin_factory(const std::string& _instance_name,
 {
     // clang-format off
     const auto no_op         = [](auto...) { return SUCCESS(); };
-    const auto not_supported = [](auto...) { return ERROR(SYS_NOT_SUPPORTED, "not supported"); };
+    const auto not_supported = [](auto...) { return CODE(SYS_NOT_SUPPORTED); };
     // clang-format on
 
     auto* re = new pluggable_rule_engine{_instance_name, _context};
