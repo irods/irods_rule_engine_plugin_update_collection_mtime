@@ -34,9 +34,9 @@ set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -stdlib=libc++ -Wl,-
 
 set(PLUGIN irods_rule_engine_plugin-update_collection_mtime)
 
-set(PLUGIN_VERSION_MAJOR 0)
+set(PLUGIN_VERSION_MAJOR 1)
 set(PLUGIN_VERSION_MINOR 0)
-set(PLUGIN_VERSION_PATCH 1)
+set(PLUGIN_VERSION_PATCH 0)
 set(PLUGIN_VERSION "${PLUGIN_VERSION_MAJOR}.${PLUGIN_VERSION_MINOR}.${PLUGIN_VERSION_PATCH}")
 
 add_library(${PLUGIN} MODULE ${CMAKE_SOURCE_DIR}/src/libirods_rule_engine_plugin-update_collection_mtime.cpp)
@@ -61,14 +61,6 @@ install(FILES ${CMAKE_SOURCE_DIR}/packaging/test_rule_engine_plugin_update_colle
 
 install(FILES ${CMAKE_SOURCE_DIR}/packaging/run_update_collection_mtime_test.py
         DESTINATION ${IRODS_HOME_DIRECTORY}/scripts
-        PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
-
-install(FILES ${CMAKE_SOURCE_DIR}/packaging/update_collection_mtime.re.template
-        DESTINATION /etc/irods
-        PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
-
-install(FILES ${CMAKE_SOURCE_DIR}/packaging/update_collection_mtime.py.template
-        DESTINATION /etc/irods
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
 
 set(PLUGIN_PACKAGE_NAME irods-rule-engine-plugin-update-collection-mtime)
