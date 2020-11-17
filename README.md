@@ -1,5 +1,7 @@
 # iRODS Rule Engine Plugin - Update Collection MTime
 
+**As of iRODS 4.2.9, this plugin is not needed as its functionality is provided by the iRODS Server directly.**
+
 This plugin was developed as a dependency for [NFSRODS](https://github.com/irods/irods_client_nfsrods).
 
 This plugin brings iRODS closer to POSIX semantics by enabling iRODS to automatically update the mtimes for
